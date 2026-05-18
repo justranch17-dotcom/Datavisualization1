@@ -202,6 +202,62 @@ Use it when checking whether a few tickers share clean structural families. The
 member CSV is generated locally by `pattern_grouping_lab.py` and is intentionally
 not committed because it is a larger derived artifact.
 
+## Pattern Review Queue
+
+Use this to choose which pattern families deserve human rating next:
+
+```powershell
+.\.venv\Scripts\python.exe .\pattern_review_queue.py
+```
+
+Outputs:
+
+```text
+model_artifacts/pattern_review_queue.csv
+model_artifacts/pattern_review_queue_report.md
+```
+
+The queue ranks families by:
+
+```text
+tightness to signature line
+model uncertainty
+average shape correlation
+days in group
+median absolute return
+```
+
+The dashboard has a `Review Queue` tab for this file. This is the preferred
+next feedback workflow: review high-priority families manually before appending
+more automatic labels.
+
+## GitHub Push Policy
+
+The source, docs, feedback file, and readable reports are pushed to GitHub.
+Generated data, raw downloads, model binaries, local environments, logs,
+databases, and credentials stay local by default.
+
+To inspect what exists locally and why it is or is not pushed:
+
+```powershell
+.\.venv\Scripts\python.exe .\artifact_manifest.py
+```
+
+Outputs:
+
+```text
+model_artifacts/artifact_manifest.csv
+model_artifacts/artifact_manifest_report.md
+```
+
+Current reason not to push literally everything:
+
+```text
+downloaded_historical_data is about 9.7 GB
+several model .joblib files are over GitHub's 100 MB file limit
+alpacakeys.env is a credential file and must not be committed
+```
+
 Latest audited grouping feedback pass:
 
 ```text

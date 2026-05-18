@@ -13,6 +13,7 @@ downloaded_historical_data/
 model_artifacts/*
 !model_artifacts/*.md
 !model_artifacts/*.txt
+!model_artifacts/*manifest*.csv
 
 # Streamlit/local runtime files
 .streamlit/secrets.toml

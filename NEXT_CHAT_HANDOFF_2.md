@@ -1787,3 +1787,112 @@ Add a "pattern family review queue" that picks the top uncertain/tight groups
 for human rating in Mach2AImarket.py, rather than adding more automated
 feedback blindly.
 ```
+
+## Fifteenth Continuation Update
+
+The user asked whether there is a way to push everything and to continue from
+the handoff.
+
+GitHub push finding:
+
+```text
+The repo is fully pushed for source/docs/feedback/reports.
+A literal push-everything is not appropriate:
+  downloaded_historical_data is about 9.7 GB
+  several .joblib model binaries exceed GitHub's 100 MB file limit
+  alpacakeys.env is a credential file
+  .venv and caches are machine-local
+```
+
+Added:
+
+```text
+artifact_manifest.py
+model_artifacts/artifact_manifest.csv
+model_artifacts/artifact_manifest_report.md
+```
+
+Run:
+
+```powershell
+.\.venv\Scripts\python.exe .\artifact_manifest.py
+```
+
+Manifest summary:
+
+```text
+do_not_push local_only: 34,468 files, 10,397.705 MB
+do_not_push_github_limit model_binary: 5 files, 817.962 MB
+prefer_artifact_storage generated_data: 44 files, 551.825 MB
+prefer_artifact_storage model_binary: 3 files, 89.967 MB
+push_ok source_or_report: 70 files, 0.804 MB
+```
+
+Implemented the next best pattern-learning improvement:
+
+```text
+pattern_review_queue.py
+model_artifacts/pattern_review_queue.csv
+model_artifacts/pattern_review_queue_report.md
+```
+
+Run:
+
+```powershell
+.\.venv\Scripts\python.exe .\pattern_review_queue.py
+```
+
+What it does:
+
+```text
+Builds a human review queue of pattern families.
+Does not append feedback automatically.
+Ranks groups by:
+  tightness_score
+  model_uncertainty
+  avg_shape_corr
+  days_in_group
+  median_abs_return
+```
+
+Updated:
+
+```text
+model_dashboard.py
+PATTERN_LEARNING_SYSTEM.md
+.gitignore
+```
+
+Dashboard now has a `Review Queue` tab:
+
+```text
+filter by ticker/type/priority
+toggle uncertain-only groups
+see tightness vs model uncertainty
+see ticker review-priority summary
+inspect queue rows
+overlay selected review-family signatures and member days
+```
+
+Top review candidates currently include:
+
+```text
+MU g18.2 momentum up
+QQQ g14.3 momentum up
+MCD g20.15 reversal down
+EWJ g16.7 momentum down
+MCD g20.16 momentum down
+TLT g20.3 momentum up
+TLT g14.1 momentum up
+FXI g18.9 momentum up
+TLT g12.1 momentum down
+PLTR g18.5 momentum up
+```
+
+Next best work:
+
+```text
+Add a one-click/manual export workflow from the Review Queue into
+Mach2AImarket.py's existing Good pattern / Not useful feedback flow, so human
+ratings from the queue become learner feedback cleanly.
+```

@@ -27,6 +27,8 @@ STAGED_REPORT_FILE = ARTIFACT_DIR / "staged_live_signal_ranker_report.md"
 PATTERN_GROUPING_FILE = ARTIFACT_DIR / "pattern_grouping_candidates.csv"
 PATTERN_GROUPING_MEMBER_FILE = ARTIFACT_DIR / "pattern_grouping_members.csv"
 PATTERN_GROUPING_REPORT_FILE = ARTIFACT_DIR / "pattern_grouping_lab_report.md"
+PATTERN_REVIEW_QUEUE_FILE = ARTIFACT_DIR / "pattern_review_queue.csv"
+PATTERN_REVIEW_REPORT_FILE = ARTIFACT_DIR / "pattern_review_queue_report.md"
 STRUCTURAL_FEATURE_FILE = ARTIFACT_DIR / "structural_day_features.csv"
 SESSION_START = "09:30"
 SESSION_END = "16:00"
@@ -151,6 +153,14 @@ def load_pattern_group_members():
     members = pd.read_csv(PATTERN_GROUPING_MEMBER_FILE)
     members["date"] = pd.to_datetime(members["date"]).dt.date
     return members.sort_values(["ticker", "group_count_setting", "pattern_group", "signature_distance"])
+
+
+@st.cache_data
+def load_pattern_review_queue():
+    if not PATTERN_REVIEW_QUEUE_FILE.exists():
+        return pd.DataFrame()
+    queue = pd.read_csv(PATTERN_REVIEW_QUEUE_FILE)
+    return queue.sort_values("review_priority", ascending=False)
 
 
 @st.cache_data
@@ -308,10 +318,11 @@ metric_cols[2].metric("Hit Rate", f"{filtered['target_bar20_followthrough'].mean
 metric_cols[3].metric("Strong Hit Rate", f"{filtered['target_bar20_strong_followthrough'].mean():.1%}")
 metric_cols[4].metric("Avg Quality", f"{filtered['bar20_entry_quality_probability'].mean():.3f}")
 
-tab_overview, tab_patterns, tab_timing, tab_combined, tab_replay, tab_raw_structure, tab_staged, tab_ranked, tab_chart, tab_report = st.tabs(
+tab_overview, tab_patterns, tab_review, tab_timing, tab_combined, tab_replay, tab_raw_structure, tab_staged, tab_ranked, tab_chart, tab_report = st.tabs(
     [
         "Overview",
         "Pattern Groups",
+        "Review Queue",
         "Entry Timing",
         "Combined Ranker",
         "Live Replay",
@@ -558,6 +569,114 @@ with tab_patterns:
                     selected_member_rows.head(top_n)[member_display],
                     use_container_width=True,
                     hide_index=True,
+                )
+
+with tab_review:
+    st.subheader("Pattern Family Review Queue")
+    queue = load_pattern_review_queue()
+    group_members = load_pattern_group_members()
+    structural_features = load_structural_features()
+
+    if queue.empty:
+        st.info("Run pattern_review_queue.py to populate this view.")
+    else:
+        review_tickers = sorted(queue["ticker"].dropna().unique())
+        review_types = sorted(queue["pattern_type"].dropna().unique())
+        col_a, col_b, col_c, col_d = st.columns(4)
+        queue_tickers = col_a.multiselect("Review tickers", review_tickers, default=[])
+        queue_types = col_b.multiselect("Review type", review_types, default=review_types)
+        min_priority = col_c.slider("Min priority", 0.0, 1.0, 0.50, 0.01)
+        uncertain_only = col_d.checkbox("Uncertain only", value=False)
+
+        queue_view = queue[
+            queue["pattern_type"].isin(queue_types)
+            & (queue["review_priority"] >= min_priority)
+        ].copy()
+        if queue_tickers:
+            queue_view = queue_view[queue_view["ticker"].isin(queue_tickers)]
+        if uncertain_only:
+            queue_view = queue_view[queue_view["model_uncertainty"] >= 0.70]
+
+        cols = st.columns(5)
+        cols[0].metric("Review Families", f"{len(queue_view):,}")
+        cols[1].metric("Avg Priority", f"{queue_view['review_priority'].mean():.3f}")
+        cols[2].metric("Avg Tightness", f"{queue_view['tightness_score'].mean():.3f}")
+        cols[3].metric("Avg Uncertainty", f"{queue_view['model_uncertainty'].mean():.3f}")
+        cols[4].metric("Avg Days", f"{queue_view['days_in_group'].mean():.1f}")
+
+        left, right = st.columns(2)
+        with left:
+            fig = px.scatter(
+                queue_view.head(1500),
+                x="tightness_score",
+                y="model_uncertainty",
+                color="pattern_type",
+                size="days_in_group",
+                hover_data=["ticker", "pattern_name", "review_reason", "representative_dates"],
+                labels={
+                    "tightness_score": "Pattern tightness",
+                    "model_uncertainty": "Model uncertainty",
+                },
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        with right:
+            review_summary = (
+                queue_view.groupby("ticker", as_index=False)
+                .agg(
+                    candidates=("group_key", "size"),
+                    avg_priority=("review_priority", "mean"),
+                    best_priority=("review_priority", "max"),
+                    avg_tightness=("tightness_score", "mean"),
+                )
+                .sort_values(["best_priority", "candidates"], ascending=[False, False])
+                .head(25)
+            )
+            fig = px.bar(
+                review_summary,
+                x="ticker",
+                y="best_priority",
+                color="candidates",
+                hover_data=["avg_priority", "avg_tightness"],
+                labels={"best_priority": "Best review priority"},
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        queue_display = [
+            "ticker",
+            "pattern_name",
+            "group_count_setting",
+            "days_in_group",
+            "review_priority",
+            "review_reason",
+            "tightness_score",
+            "model_uncertainty",
+            "avg_ensemble_score",
+            "avg_shape_corr",
+            "median_abs_return",
+            "representative_dates",
+        ]
+        st.dataframe(queue_view.head(top_n)[queue_display], use_container_width=True, hide_index=True)
+
+        if not queue_view.empty and not group_members.empty and not structural_features.empty:
+            shape_choices = queue_view.head(150).copy()
+            shape_choices["label"] = (
+                shape_choices["ticker"].astype(str)
+                + " | priority "
+                + shape_choices["review_priority"].round(3).astype(str)
+                + " | "
+                + shape_choices["pattern_name"].astype(str)
+            )
+            selected_review_labels = st.multiselect(
+                "Review shapes",
+                shape_choices["label"].tolist(),
+                default=shape_choices["label"].head(2).tolist(),
+            )
+            selected_review_rows = shape_choices[shape_choices["label"].isin(selected_review_labels)]
+            if not selected_review_rows.empty:
+                st.plotly_chart(
+                    make_pattern_shape_chart(selected_review_rows, group_members, structural_features),
+                    use_container_width=True,
                 )
 
 with tab_timing:
