@@ -1,0 +1,25 @@
+Summary model
+rows=17688 positives=1188 negatives=16500
+roc_auc=0.962 average_precision=0.723
+              precision    recall  f1-score   support
+
+           0       0.98      0.98      0.98      4951
+           1       0.69      0.69      0.69       356
+
+    accuracy                           0.96      5307
+   macro avg       0.83      0.84      0.84      5307
+weighted avg       0.96      0.96      0.96      5307
+
+
+Rich shape model
+rows=20063 positives=3700 negatives=16363
+roc_auc=0.502 average_precision=0.166
+              precision    recall  f1-score   support
+
+           0       0.79      0.84      0.81      4909
+           1       0.03      0.02      0.03      1110
+
+    accuracy                           0.69      6019
+   macro avg       0.41      0.43      0.42      6019
+weighted avg       0.65      0.69      0.67      6019
+

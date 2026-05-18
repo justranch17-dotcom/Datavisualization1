@@ -1,0 +1,32 @@
+Before automated feedback
+rows=17688 positives=1188 negatives=16500
+roc_auc=0.952 average_precision=0.714
+              precision    recall  f1-score   support
+
+           0       0.98      0.97      0.98      4951
+           1       0.67      0.73      0.70       356
+
+    accuracy                           0.96      5307
+   macro avg       0.83      0.85      0.84      5307
+weighted avg       0.96      0.96      0.96      5307
+
+
+After automated feedback
+rows=22139 positives=1449 negatives=20690
+roc_auc=0.960 average_precision=0.765
+              precision    recall  f1-score   support
+
+           0       0.98      0.97      0.98      6207
+           1       0.68      0.75      0.71       435
+
+    accuracy                           0.96      6642
+   macro avg       0.83      0.86      0.85      6642
+weighted avg       0.96      0.96      0.96      6642
+
+
+Backtest summary
+good_groups=266 bad_groups=4231
+good_test_avg_abs_return=2.4033
+bad_test_avg_abs_return=1.3737
+good_avg_cohesion=0.7897
+bad_avg_cohesion=0.6844

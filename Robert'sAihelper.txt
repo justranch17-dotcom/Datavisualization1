@@ -1,0 +1,8 @@
+#this is a helper file for my AI to tell it who I am 
+I am an up and coming data analyst/specialist. I currently work for a foundation and in the off time i am looking to create a way so see and find patterns
+in the maketplace. Specifically high volatile moarkerts with high Liquidity/volume.
+I want to create a way to find patterns in the market by comparing days of a stock index or future. Right now I have been creating a web app, and visualizin the day charts
+I want see if there are patterns when a specific market moves a certain way. Does it also move similary in another day if they meet similar criteria, and if they don't why and 
+what other days were similar, or hit the same criteria and did not hit.
+
+My goal is to create a way to easily find patterns within the market using visual charts.

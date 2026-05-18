@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local credentials and machine-specific files
+*.env
+alpacakeys.env
+
+# Downloaded/raw market data can be regenerated and may be large.
+downloaded_historical_data/
+
+# Keep generated reports, but do not commit bulky generated model/data artifacts.
+model_artifacts/*
+!model_artifacts/*.md
+!model_artifacts/*.txt
+
+# Streamlit/local runtime files
+.streamlit/secrets.toml
+*.log
+*.err.log
+*.db
