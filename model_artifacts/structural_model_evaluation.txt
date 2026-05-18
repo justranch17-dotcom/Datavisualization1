@@ -1,25 +1,25 @@
 Summary model
-rows=17688 positives=1188 negatives=16500
-roc_auc=0.962 average_precision=0.723
+rows=22139 positives=1449 negatives=20690
+roc_auc=0.959 average_precision=0.754
               precision    recall  f1-score   support
 
-           0       0.98      0.98      0.98      4951
-           1       0.69      0.69      0.69       356
+           0       0.98      0.98      0.98      6207
+           1       0.68      0.73      0.70       435
 
-    accuracy                           0.96      5307
-   macro avg       0.83      0.84      0.84      5307
-weighted avg       0.96      0.96      0.96      5307
+    accuracy                           0.96      6642
+   macro avg       0.83      0.85      0.84      6642
+weighted avg       0.96      0.96      0.96      6642
 
 
 Rich shape model
-rows=20063 positives=3700 negatives=16363
-roc_auc=0.502 average_precision=0.166
+rows=20734 positives=3925 negatives=16809
+roc_auc=0.492 average_precision=0.168
               precision    recall  f1-score   support
 
-           0       0.79      0.84      0.81      4909
-           1       0.03      0.02      0.03      1110
+           0       0.78      0.83      0.81      5043
+           1       0.03      0.02      0.03      1178
 
-    accuracy                           0.69      6019
-   macro avg       0.41      0.43      0.42      6019
-weighted avg       0.65      0.69      0.67      6019
+    accuracy                           0.68      6221
+   macro avg       0.41      0.43      0.42      6221
+weighted avg       0.64      0.68      0.66      6221
 

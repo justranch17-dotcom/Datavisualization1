@@ -1642,3 +1642,148 @@ Best next command:
 ```powershell
 .\.venv\Scripts\python.exe -m streamlit run .\model_dashboard.py --server.port 8502
 ```
+
+## Fourteenth Continuation Update
+
+The user asked to improve the dashboard so a few tickers' pattern groups can be
+checked visually, then continue improving feedback and learners.
+
+Updated:
+
+```text
+pattern_grouping_lab.py
+model_dashboard.py
+PATTERN_LEARNING_SYSTEM.md
+```
+
+Pattern grouping lab now writes a second local artifact:
+
+```text
+model_artifacts/pattern_grouping_members.csv
+```
+
+This file records each day inside each pattern family:
+
+```text
+ticker
+group_count_setting
+pattern_group
+group_key
+date
+signature_distance
+avg_return
+avg_range
+avg_early_move
+avg_shift_strength
+avg_shift_count
+```
+
+Ran:
+
+```powershell
+.\.venv\Scripts\python.exe .\pattern_grouping_lab.py --group-counts 12 14 16 18 20 --min-group-days 3
+```
+
+Grouping result stayed stable:
+
+```text
+total_groups: 6,470
+20-group high-quality groups: 482
+18-group high-quality groups: 390
+16-group high-quality groups: 361
+14-group high-quality groups: 273
+12-group high-quality groups: 187
+```
+
+Dashboard Pattern Groups tab now supports:
+
+```text
+multi-ticker filtering
+group-count filtering
+pattern-type filtering
+minimum tightness and minimum-days filters
+ticker pattern-quality bar chart
+pattern family table
+multi-family signature-line comparison
+member-day line overlays
+member date table sorted by signature distance
+```
+
+The dashboard is still running:
+
+```text
+http://localhost:8502
+```
+
+Feedback/learner note:
+
+```text
+An attempted stricter de-duplication of mach2_group_feedback.csv was too
+aggressive. It collapsed distinct pattern families that share rounded summary
+signatures and reduced the file from 22,139 rows to 12,050 rows.
+
+Validation fell:
+  average_precision: 0.765 -> 0.412
+  good-pattern f1: 0.71 -> 0.45
+
+The feedback file was restored to the 22,139-row state from git.
+Do not de-dup only by rounded signature/ticker/group/rating.
+```
+
+Then retrained the learner from the restored feedback:
+
+```powershell
+.\.venv\Scripts\python.exe .\structural_pattern_learner.py --interval 5m --model-mode both
+.\.venv\Scripts\python.exe .\build_ensemble_scores.py
+.\.venv\Scripts\python.exe .\score_backtest_report.py
+```
+
+Restored learner state:
+
+```text
+feedback_training_rows: 22,139
+summary validation accuracy: 0.96
+good-pattern precision: 0.68
+good-pattern recall: 0.73
+good-pattern f1: 0.70
+```
+
+Updated score report:
+
+```text
+structural_day_ensemble_scores.csv rows scored: 43,276
+top 1% avg abs return: 2.3243
+top 5% avg abs return: 2.0670
+bottom 50% avg abs return: 0.5732
+top 1% lift vs bottom half: 4.055x
+top 5% lift vs bottom half: 3.606x
+```
+
+Current top ensemble candidates:
+
+```text
+HD 2025-11-25
+CSCO 2025-11-12
+LOW 2024-06-25
+AVGO 2024-08-13
+JPM 2026-03-03
+V 2025-04-22
+MA 2025-01-27
+TGT 2024-07-11
+BA 2024-07-16
+MCHI 2026-01-12
+```
+
+Verified:
+
+```powershell
+.\.venv\Scripts\python.exe -m py_compile .\model_dashboard.py .\pattern_grouping_lab.py .\automated_structural_feedback.py
+```
+
+Next best implementation:
+
+```text
+Add a "pattern family review queue" that picks the top uncertain/tight groups
+for human rating in Mach2AImarket.py, rather than adding more automated
+feedback blindly.
+```

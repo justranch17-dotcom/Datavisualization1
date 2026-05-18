@@ -12,6 +12,7 @@ from structural_pattern_learner import FEATURE_FILE
 
 ARTIFACT_DIR = Path("model_artifacts")
 GROUP_FILE = ARTIFACT_DIR / "pattern_grouping_candidates.csv"
+GROUP_MEMBER_FILE = ARTIFACT_DIR / "pattern_grouping_members.csv"
 REPORT_FILE = ARTIFACT_DIR / "pattern_grouping_lab_report.md"
 
 
@@ -94,9 +95,36 @@ def representative_dates(group, shape_cols, count=8):
     return ", ".join(f"{row.date}" for row in reps.itertuples())
 
 
+def group_member_rows(ticker, group_count, label, group, shape_cols):
+    matrix = group[shape_cols].to_numpy(dtype=float)
+    signature = matrix.mean(axis=0)
+    distances = np.sqrt(np.mean((matrix - signature) ** 2, axis=1))
+    member_rows = []
+
+    for distance, row in zip(distances, group.itertuples(index=False)):
+        member_rows.append(
+            {
+                "ticker": ticker,
+                "group_count_setting": group_count,
+                "pattern_group": int(label),
+                "group_key": f"{ticker}|{group_count}|{label}",
+                "date": row.date,
+                "signature_distance": float(distance),
+                "avg_return": float(row.avg_return),
+                "avg_range": float(row.avg_range),
+                "avg_early_move": float(row.avg_early_move),
+                "avg_shift_strength": float(row.avg_shift_strength),
+                "avg_shift_count": float(row.avg_shift_count),
+            }
+        )
+
+    return member_rows
+
+
 def build_groups(features, group_counts, min_group_days, max_tickers):
     shape_cols = shape_columns(features)
     rows = []
+    members = []
     tickers = sorted(features["ticker"].dropna().astype(str).unique())
     if max_tickers:
         tickers = tickers[:max_tickers]
@@ -127,19 +155,22 @@ def build_groups(features, group_counts, min_group_days, max_tickers):
                     continue
 
                 metrics = group_metrics(group, shape_cols)
+                group_key = f"{ticker}|{group_count}|{label}"
                 rows.append(
                     {
                         "ticker": ticker,
                         "group_count_setting": group_count,
                         "pattern_group": int(label),
+                        "group_key": group_key,
                         "pattern_name": f"{ticker} g{group_count}.{label}: {direction_name(metrics['avg_return'], metrics['avg_early_move'])}",
                         "cluster_silhouette": silhouette,
                         "representative_dates": representative_dates(group, shape_cols),
                         **metrics,
                     }
                 )
+                members.extend(group_member_rows(ticker, group_count, label, group, shape_cols))
 
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows), pd.DataFrame(members)
 
 
 def summarize(groups):
@@ -169,12 +200,14 @@ def main():
         raise SystemExit("Run structural_pattern_learner.py first.")
 
     features = pd.read_csv(FEATURE_FILE)
-    groups = build_groups(features, args.group_counts, args.min_group_days, args.max_tickers)
+    groups, members = build_groups(features, args.group_counts, args.min_group_days, args.max_tickers)
     if groups.empty:
         raise SystemExit("No pattern groups were generated.")
 
     groups = groups.sort_values("tightness_score", ascending=False)
     groups.to_csv(GROUP_FILE, index=False)
+    members = members.sort_values(["ticker", "group_count_setting", "pattern_group", "signature_distance"])
+    members.to_csv(GROUP_MEMBER_FILE, index=False)
 
     summary = summarize(groups)
     top = groups.head(args.top_groups)
@@ -211,6 +244,13 @@ def main():
         "",
         "```text",
         summary.to_string(index=False),
+        "```",
+        "",
+        "## Output Files",
+        "",
+        "```text",
+        str(GROUP_FILE),
+        str(GROUP_MEMBER_FILE),
         "```",
         "",
         "## Top Tight Pattern Groups",

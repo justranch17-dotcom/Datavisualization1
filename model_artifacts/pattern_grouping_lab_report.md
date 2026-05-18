@@ -21,6 +21,13 @@ total_groups=6470
                   12    1036       0.561317  0.664728      0.102216  0.460532  0.538774        0.179148                  187
 ```
 
+## Output Files
+
+```text
+model_artifacts\pattern_grouping_candidates.csv
+model_artifacts\pattern_grouping_members.csv
+```
+
 ## Top Tight Pattern Groups
 
 ```text

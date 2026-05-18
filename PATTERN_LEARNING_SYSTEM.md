@@ -176,6 +176,7 @@ Latest grouping outputs:
 
 ```text
 model_artifacts/pattern_grouping_candidates.csv
+model_artifacts/pattern_grouping_members.csv
 model_artifacts/pattern_grouping_lab_report.md
 ```
 
@@ -184,6 +185,22 @@ The dashboard now has a `Pattern Groups` tab for these files:
 ```powershell
 .\.venv\Scripts\python.exe -m streamlit run .\model_dashboard.py --server.port 8502
 ```
+
+The Pattern Groups tab supports:
+
+```text
+multi-ticker filtering
+group-count filtering
+pattern-type filtering
+ticker quality comparison
+signature-line comparison for selected pattern families
+member-day line overlays for each selected family
+representative date tables
+```
+
+Use it when checking whether a few tickers share clean structural families. The
+member CSV is generated locally by `pattern_grouping_lab.py` and is intentionally
+not committed because it is a larger derived artifact.
 
 Latest audited grouping feedback pass:
 
@@ -210,6 +227,21 @@ Accuracy: 0.96
 
 This is a better shape-learning result than the previous feedback state because
 the model is being taught from denser, more visually coherent pattern families.
+
+## Feedback Quality Lesson
+
+A strict de-duplication experiment collapsed the feedback file from 22,139 rows
+to 12,050 rows because many distinct structural groups share rounded summary
+signatures. Validation dropped sharply:
+
+```text
+average precision fell from 0.765 to 0.412
+good-pattern F1 fell from 0.71 to 0.45
+```
+
+The file was restored to the richer 22,139-row feedback state. Do not de-dup
+automated labels only by rounded signature, ticker, group name, and rating. The
+rounded signature is too coarse to represent all distinct pattern families.
 
 ## Latest Automated Run
 

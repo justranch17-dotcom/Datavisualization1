@@ -25,7 +25,9 @@ STAGED_RANKING_FILE = ARTIFACT_DIR / "staged_live_signal_rankings.csv"
 STAGED_SUMMARY_FILE = ARTIFACT_DIR / "staged_live_signal_summary.csv"
 STAGED_REPORT_FILE = ARTIFACT_DIR / "staged_live_signal_ranker_report.md"
 PATTERN_GROUPING_FILE = ARTIFACT_DIR / "pattern_grouping_candidates.csv"
+PATTERN_GROUPING_MEMBER_FILE = ARTIFACT_DIR / "pattern_grouping_members.csv"
 PATTERN_GROUPING_REPORT_FILE = ARTIFACT_DIR / "pattern_grouping_lab_report.md"
+STRUCTURAL_FEATURE_FILE = ARTIFACT_DIR / "structural_day_features.csv"
 SESSION_START = "09:30"
 SESSION_END = "16:00"
 
@@ -131,7 +133,37 @@ def load_pattern_groups():
     if not PATTERN_GROUPING_FILE.exists():
         return pd.DataFrame()
     groups = pd.read_csv(PATTERN_GROUPING_FILE)
+    if "group_key" not in groups.columns:
+        groups["group_key"] = (
+            groups["ticker"].astype(str)
+            + "|"
+            + groups["group_count_setting"].astype(str)
+            + "|"
+            + groups["pattern_group"].astype(str)
+        )
     return groups.sort_values("tightness_score", ascending=False)
+
+
+@st.cache_data
+def load_pattern_group_members():
+    if not PATTERN_GROUPING_MEMBER_FILE.exists():
+        return pd.DataFrame()
+    members = pd.read_csv(PATTERN_GROUPING_MEMBER_FILE)
+    members["date"] = pd.to_datetime(members["date"]).dt.date
+    return members.sort_values(["ticker", "group_count_setting", "pattern_group", "signature_distance"])
+
+
+@st.cache_data
+def load_structural_features():
+    if not STRUCTURAL_FEATURE_FILE.exists():
+        return pd.DataFrame()
+    features = pd.read_csv(STRUCTURAL_FEATURE_FILE)
+    features["date"] = pd.to_datetime(features["date"]).dt.date
+    return features
+
+
+def shape_columns(df):
+    return [column for column in df.columns if column.startswith("shape_")]
 
 
 def bucket_summary(df):
@@ -182,6 +214,61 @@ def make_day_chart(day, row):
         margin=dict(l=10, r=10, t=35, b=10),
         xaxis_rangeslider_visible=False,
         title=f"{row['ticker']} {row['date']} | quality {row['bar20_entry_quality_probability']:.3f} | signed return {row['signed_bar20_close_return_pct']:.2f}%",
+    )
+    return fig
+
+
+def make_pattern_shape_chart(selected_groups, members, features, max_days_per_group=8):
+    shape_cols = shape_columns(features)
+    fig = go.Figure()
+
+    for group in selected_groups.itertuples(index=False):
+        group_members = members[members["group_key"] == group.group_key].head(max_days_per_group)
+        if group_members.empty:
+            continue
+
+        group_features = features[
+            (features["ticker"].astype(str) == str(group.ticker))
+            & features["date"].isin(group_members["date"])
+        ].copy()
+        if group_features.empty:
+            continue
+
+        signature = group_features[shape_cols].mean(axis=0).to_numpy(dtype=float)
+        x_values = list(range(1, len(shape_cols) + 1))
+        label = f"{group.pattern_name} | tight {group.tightness_score:.3f}"
+
+        fig.add_trace(
+            go.Scatter(
+                x=x_values,
+                y=signature,
+                mode="lines",
+                name=label,
+                line=dict(width=4),
+            )
+        )
+
+        for row in group_features.sort_values("date").itertuples(index=False):
+            fig.add_trace(
+                go.Scatter(
+                    x=x_values,
+                    y=[getattr(row, column) for column in shape_cols],
+                    mode="lines",
+                    name=f"{row.ticker} {row.date}",
+                    opacity=0.22,
+                    line=dict(width=1),
+                    showlegend=False,
+                    hovertemplate=f"{row.ticker} {row.date}<br>point=%{{x}}<br>move=%{{y:.2f}}%<extra></extra>",
+                )
+            )
+
+    fig.add_hline(y=0, line_dash="dash", line_color="#6b7280")
+    fig.update_layout(
+        height=560,
+        margin=dict(l=10, r=10, t=35, b=10),
+        xaxis_title="Normalized intraday point",
+        yaxis_title="Move from session open %",
+        legend_title_text="Pattern signature",
     )
     return fig
 
@@ -290,6 +377,8 @@ with tab_overview:
 with tab_patterns:
     st.subheader("Structural Pattern Families")
     groups = load_pattern_groups()
+    group_members = load_pattern_group_members()
+    structural_features = load_structural_features()
 
     if groups.empty:
         st.info("Run pattern_grouping_lab.py to populate this view.")
@@ -297,20 +386,22 @@ with tab_patterns:
         pattern_types = sorted(groups["pattern_name"].str.split(": ").str[-1].dropna().unique())
         tickers = sorted(groups["ticker"].dropna().unique())
 
-        col_a, col_b, col_c, col_d = st.columns(4)
+        col_a, col_b, col_c, col_d, col_e = st.columns(5)
         selected_group_counts = col_a.multiselect(
             "Group counts",
             sorted(groups["group_count_setting"].dropna().unique()),
             default=sorted(groups["group_count_setting"].dropna().unique()),
         )
         selected_pattern_types = col_b.multiselect("Pattern type", pattern_types, default=pattern_types)
-        selected_tickers = col_c.multiselect("Ticker", tickers, default=[])
+        selected_tickers = col_c.multiselect("Tickers", tickers, default=[])
         min_tightness = col_d.slider("Min tightness", 0.0, 1.0, 0.75, 0.01)
+        min_group_days = col_e.slider("Min days", 3, 25, 3, 1)
 
         pattern_view = groups[
             groups["group_count_setting"].isin(selected_group_counts)
             & groups["pattern_name"].str.split(": ").str[-1].isin(selected_pattern_types)
             & (groups["tightness_score"] >= min_tightness)
+            & (groups["days_in_group"] >= min_group_days)
         ].copy()
         if selected_tickers:
             pattern_view = pattern_view[pattern_view["ticker"].isin(selected_tickers)]
@@ -327,6 +418,17 @@ with tab_patterns:
                 avg_days=("days_in_group", "mean"),
             )
             .sort_values("group_count_setting")
+        )
+        ticker_summary = (
+            pattern_view.groupby("ticker", as_index=False)
+            .agg(
+                groups=("group_key", "size"),
+                avg_tightness=("tightness_score", "mean"),
+                best_tightness=("tightness_score", "max"),
+                avg_corr=("avg_shape_corr", "mean"),
+                avg_days=("days_in_group", "mean"),
+            )
+            .sort_values(["best_tightness", "groups"], ascending=[False, False])
         )
 
         metric_cols = st.columns(5)
@@ -357,13 +459,29 @@ with tab_patterns:
                 pattern_view.head(1500),
                 x="avg_shape_corr",
                 y="signature_rmse",
-                color="group_count_setting",
+                color="ticker" if selected_tickers else "group_count_setting",
                 size="days_in_group",
                 hover_data=["ticker", "pattern_name", "representative_dates", "tightness_score"],
                 labels={
                     "avg_shape_corr": "Average shape correlation",
                     "signature_rmse": "Signature RMSE",
                     "group_count_setting": "Groups",
+                },
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        if not ticker_summary.empty:
+            st.subheader("Ticker Pattern Quality")
+            fig = px.bar(
+                ticker_summary.head(25),
+                x="ticker",
+                y="best_tightness",
+                color="groups",
+                hover_data=["avg_tightness", "avg_corr", "avg_days"],
+                labels={
+                    "ticker": "Ticker",
+                    "best_tightness": "Best pattern tightness",
+                    "groups": "Families",
                 },
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -384,6 +502,63 @@ with tab_patterns:
             "representative_dates",
         ]
         st.dataframe(pattern_view.head(top_n)[display_cols], use_container_width=True, hide_index=True)
+
+        if group_members.empty or structural_features.empty:
+            st.info("Run pattern_grouping_lab.py again to enable member shape inspection.")
+        elif pattern_view.empty:
+            st.info("No pattern families match the current filters.")
+        else:
+            st.subheader("Compare Pattern Shapes")
+            pattern_choices = pattern_view.head(250).copy()
+            pattern_choices["label"] = (
+                pattern_choices["ticker"].astype(str)
+                + " | g"
+                + pattern_choices["group_count_setting"].astype(str)
+                + "."
+                + pattern_choices["pattern_group"].astype(str)
+                + " | tight "
+                + pattern_choices["tightness_score"].round(3).astype(str)
+                + " | "
+                + pattern_choices["pattern_name"].str.split(": ").str[-1]
+                + " | reps "
+                + pattern_choices["representative_dates"].astype(str)
+            )
+            default_labels = pattern_choices["label"].head(3).tolist()
+            selected_pattern_labels = st.multiselect(
+                "Pattern families to compare",
+                pattern_choices["label"].tolist(),
+                default=default_labels,
+            )
+            max_days_per_group = st.slider("Member lines per family", 3, 20, 8, 1)
+            selected_pattern_rows = pattern_choices[pattern_choices["label"].isin(selected_pattern_labels)]
+
+            if not selected_pattern_rows.empty:
+                st.plotly_chart(
+                    make_pattern_shape_chart(
+                        selected_pattern_rows,
+                        group_members,
+                        structural_features,
+                        max_days_per_group=max_days_per_group,
+                    ),
+                    use_container_width=True,
+                )
+
+                selected_member_rows = group_members[group_members["group_key"].isin(selected_pattern_rows["group_key"])]
+                member_display = [
+                    "ticker",
+                    "group_count_setting",
+                    "pattern_group",
+                    "date",
+                    "signature_distance",
+                    "avg_return",
+                    "avg_range",
+                    "avg_early_move",
+                ]
+                st.dataframe(
+                    selected_member_rows.head(top_n)[member_display],
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
 with tab_timing:
     st.subheader("Which Entry Bar Works Best?")
